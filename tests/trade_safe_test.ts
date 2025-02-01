@@ -29,7 +29,7 @@ Clarinet.test({
 });
 
 Clarinet.test({
-    name: "Test complete trade flow",
+    name: "Test complete trade flow with ratings",
     async fn(chain: Chain, accounts: Map<string, Account>) {
         const deployer = accounts.get('deployer')!;
         const buyer = accounts.get('wallet_1')!;
@@ -47,20 +47,35 @@ Clarinet.test({
             // Confirm delivery
             Tx.contractCall('trade-safe', 'confirm-delivery', [
                 types.uint(1)
-            ], buyer.address)
+            ], buyer.address),
+
+            // Submit buyer rating
+            Tx.contractCall('trade-safe', 'submit-rating', [
+                types.uint(1),
+                types.uint(1), // Positive rating
+                types.utf8("Great seller!")
+            ], buyer.address),
+
+            // Submit seller rating
+            Tx.contractCall('trade-safe', 'submit-rating', [
+                types.uint(1),
+                types.uint(1), // Positive rating
+                types.utf8("Great buyer!")
+            ], seller.address)
         ]);
         
         block.receipts.map(receipt => receipt.result.expectOk());
         
-        // Verify trade status
-        let statusBlock = chain.mineBlock([
-            Tx.contractCall('trade-safe', 'get-trade', [
-                types.uint(1)
+        // Verify ratings
+        let ratingBlock = chain.mineBlock([
+            Tx.contractCall('trade-safe', 'get-user-rating', [
+                types.principal(seller.address)
             ], deployer.address)
         ]);
         
-        const trade = statusBlock.receipts[0].result.expectOk().expectSome();
-        assertEquals(trade['status'], types.uint(3)); // COMPLETED
+        const rating = ratingBlock.receipts[0].result.expectOk().expectSome();
+        assertEquals(rating['positive-ratings'], types.uint(1));
+        assertEquals(rating['total-trades'], types.uint(1));
     }
 });
 
