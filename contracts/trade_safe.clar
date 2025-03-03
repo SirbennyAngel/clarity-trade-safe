@@ -10,8 +10,8 @@
 (define-constant err-invalid-state (err u105))
 (define-constant err-already-rated (err u106))
 (define-constant err-timeout (err u107))
-
-;; [Previous constants remain unchanged...]
+(define-constant MIN-TIMEOUT u10) ;; Minimum blocks for timeout
+(define-constant SAFETY-BUFFER u2) ;; Buffer blocks for network delays
 
 ;; Confirm delivery
 (define-public (confirm-delivery (trade-id uint))
@@ -19,7 +19,7 @@
         ((trade (unwrap! (map-get? trades {trade-id: trade-id}) err-invalid-trade)))
         (asserts! (is-eq (get buyer trade) tx-sender) err-unauthorized)
         (asserts! (is-eq (get status trade) TRADE_STATUS_PENDING) err-invalid-state)
-        (asserts! (<= block-height (get timeout trade)) err-timeout)
+        (asserts! (<= block-height (- (get timeout trade) SAFETY-BUFFER)) err-timeout)
         (try! (release-funds trade-id))
         (map-set trades
             {trade-id: trade-id}
@@ -36,7 +36,7 @@
         (asserts! (is-eq (get buyer trade) tx-sender) err-unauthorized)
         (asserts! (is-eq (get status trade) TRADE_STATUS_PENDING) err-invalid-state)
         (asserts! (> block-height (get timeout trade)) err-invalid-state)
-        (try! (as-contract (stx-transfer? (get amount trade) tx-sender tx-sender)))
+        (try! (as-contract (stx-transfer? (get amount trade) (as-contract tx-sender) (get buyer trade))))
         (map-set trades
             {trade-id: trade-id}
             (merge trade {status: TRADE_STATUS_CANCELLED})
@@ -44,5 +44,3 @@
         (ok true)
     )
 )
-
-;; [Rest of the contract remains unchanged...]
